@@ -163,53 +163,150 @@
     };
   }
 
-  /* ---------------- music (YouTube embed) ---------------- */
+  /* ---------------- audio (original Web Audio music + SFX) ---------------- */
 
-  // Streams the track through YouTube's official player (small visible
-  // widget, bottom-right). Fails silently if YouTube is unreachable.
-  const MUSIC_VIDEO_ID = "ko70cExuzZM";
-  let ytPlayer = null;
-  let ytReady = false;
-  let musicMuted = false;
+  // All music and effects are synthesized at runtime — no audio assets,
+  // no licensing entanglements. "Corridor Sprint" original loop, 132 BPM.
+  const Audio = (function () {
+    let ac = null, master = null, musicBus = null, sfxBus = null;
+    let muted = false, playing = false;
+    let schedTimer = null, nextTime = 0, step = 0;
 
-  (function initMusic() {
-    const tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    tag.onerror = () => { document.getElementById("music-box").style.display = "none"; };
-    document.head.appendChild(tag);
-    window.onYouTubeIframeAPIReady = function () {
-      ytPlayer = new YT.Player("yt-player", {
-        videoId: MUSIC_VIDEO_ID,
-        playerVars: {
-          loop: 1,
-          playlist: MUSIC_VIDEO_ID, // required for loop to work
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          playsinline: 1,
-        },
-        events: {
-          onReady: () => { ytReady = true; ytPlayer.setVolume(35); },
-          onError: () => { document.getElementById("music-box").style.display = "none"; },
-        },
-      });
+    const BPM = 132;
+    const SPB = 60 / BPM;      // seconds per beat
+    const STEP = SPB / 4;      // 16th note
+    const BARS = 4, STEPS = BARS * 16;
+
+    // I–vi–IV–V progression in C. Bass roots per bar:
+    const BASS = [65.41, 55.0, 87.31, 98.0]; // C2 A1 F2 G2
+    // Lead melody: [stepIndex, freq, lengthInSteps]
+    const N = { C4: 261.6, D4: 293.7, E4: 329.6, F4: 349.2, G4: 392.0, A4: 440.0, B4: 493.9, C5: 523.3, D5: 587.3, E5: 659.3, G5: 784.0 };
+    const LEAD = [
+      [0, N.E4, 2], [2, N.G4, 2], [4, N.C5, 3], [8, N.G4, 2], [10, N.E4, 2], [12, N.G4, 4],
+      [16, N.A4, 2], [18, N.C5, 2], [20, N.E5, 3], [24, N.C5, 2], [26, N.A4, 2], [28, N.C5, 4],
+      [32, N.F4, 2], [34, N.A4, 2], [36, N.C5, 3], [40, N.A4, 2], [42, N.F4, 2], [44, N.A4, 4],
+      [48, N.G4, 2], [50, N.B4, 2], [52, N.D5, 3], [56, N.B4, 1], [57, N.D5, 1], [58, N.G5, 2], [60, N.E5, 4],
+    ];
+
+    function ensureCtx() {
+      if (ac) return true;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      ac = new AC();
+      master = ac.createGain();
+      master.gain.value = 1;
+      master.connect(ac.destination);
+      musicBus = ac.createGain();
+      musicBus.gain.value = 0.22;
+      musicBus.connect(master);
+      sfxBus = ac.createGain();
+      sfxBus.gain.value = 0.5;
+      sfxBus.connect(master);
+      return true;
+    }
+
+    function osc(bus, t, freq, dur, type, vol, glideTo) {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g); g.connect(bus);
+      o.start(t); o.stop(t + dur + 0.02);
+    }
+
+    function noise(bus, t, dur, vol, filterFreq, type) {
+      const len = Math.max(1, (dur * ac.sampleRate) | 0);
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      const filt = ac.createBiquadFilter();
+      filt.type = type || "highpass";
+      filt.frequency.value = filterFreq;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(filt); filt.connect(g); g.connect(bus);
+      src.start(t); src.stop(t + dur);
+    }
+
+    function kick(t) {
+      osc(musicBus, t, 140, 0.12, "sine", 0.9, 45);
+    }
+
+    function scheduleStep(s, t) {
+      const bar = (s / 16) | 0;
+      const inBar = s % 16;
+      if (inBar % 4 === 0) kick(t);                       // four-on-the-floor
+      if (inBar % 4 === 2) noise(musicBus, t, 0.04, 0.25, 6000); // offbeat hat
+      if (inBar % 2 === 0) osc(musicBus, t, BASS[bar], STEP * 1.7, "triangle", 0.5); // 8th bass
+      for (const [st, fr, ln] of LEAD) {
+        if (st === s) osc(musicBus, t, fr, STEP * ln * 0.92, "square", 0.16);
+      }
+    }
+
+    function scheduler() {
+      while (nextTime < ac.currentTime + 0.14) {
+        scheduleStep(step, nextTime);
+        step = (step + 1) % STEPS;
+        nextTime += STEP;
+      }
+    }
+
+    return {
+      start() {
+        if (!ensureCtx()) return;
+        if (ac.state === "suspended") ac.resume();
+        if (playing) return;
+        playing = true;
+        step = 0;
+        nextTime = ac.currentTime + 0.06;
+        schedTimer = setInterval(scheduler, 30);
+      },
+      stop() {
+        playing = false;
+        if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
+      },
+      toggleMute() {
+        if (!ensureCtx()) return;
+        muted = !muted;
+        master.gain.value = muted ? 0 : 1;
+      },
+      sfx(name) {
+        if (!ensureCtx() || muted) return;
+        if (ac.state === "suspended") ac.resume();
+        const t = ac.currentTime;
+        switch (name) {
+          case "jump": osc(sfxBus, t, 280, 0.18, "square", 0.35, 620); break;
+          case "slide": noise(sfxBus, t, 0.22, 0.3, 900, "lowpass"); break;
+          case "coffee":
+            osc(sfxBus, t, 1046, 0.07, "sine", 0.35);
+            osc(sfxBus, t + 0.07, 1568, 0.09, "sine", 0.3);
+            break;
+          case "power":
+            [523, 659, 784, 1046].forEach((f, i) => osc(sfxBus, t + i * 0.06, f, 0.1, "square", 0.25));
+            break;
+          case "promotion":
+            [523, 659, 784, 1046, 1318].forEach((f, i) => osc(sfxBus, t + i * 0.08, f, 0.22, "triangle", 0.35));
+            break;
+          case "shield": osc(sfxBus, t, 880, 0.25, "sine", 0.4, 440); break;
+          case "crash":
+            noise(sfxBus, t, 0.35, 0.5, 1200, "lowpass");
+            osc(sfxBus, t, 220, 0.45, "sawtooth", 0.4, 55);
+            break;
+        }
+      },
     };
   })();
 
-  function musicPlay() {
-    if (ytReady && !musicMuted) { try { ytPlayer.playVideo(); } catch (e) {} }
-  }
-  function musicPause() {
-    if (ytReady) { try { ytPlayer.pauseVideo(); } catch (e) {} }
-  }
-  function musicToggleMute() {
-    if (!ytReady) return;
-    musicMuted = !musicMuted;
-    try {
-      if (musicMuted) { ytPlayer.mute(); }
-      else { ytPlayer.unMute(); if (state === S.RUNNING) ytPlayer.playVideo(); }
-    } catch (e) {}
-  }
+  function musicPlay() { Audio.start(); }
+  function musicPause() { Audio.stop(); }
+  function musicToggleMute() { Audio.toggleMute(); }
 
   /* ---------------- input ---------------- */
 
@@ -220,11 +317,11 @@
   }
   function doJump() {
     if (state !== S.RUNNING) return;
-    if (player.jumpT < 0 && player.slideT < 0) player.jumpT = 0;
+    if (player.jumpT < 0 && player.slideT < 0) { player.jumpT = 0; Audio.sfx("jump"); }
   }
   function doSlide() {
     if (state !== S.RUNNING) return;
-    if (player.slideT < 0 && player.jumpT < 0) player.slideT = 0;
+    if (player.slideT < 0 && player.jumpT < 0) { player.slideT = 0; Audio.sfx("slide"); }
   }
 
   window.addEventListener("keydown", (e) => {
@@ -349,6 +446,7 @@
       game.bannerText = "PROMOTED: " + next.name + "!";
       game.bannerT = 2.2;
       burst(W / 2, H * 0.3, 26, "#ffd76e");
+      Audio.sfx("promotion");
     }
 
     // player lane lerp
@@ -404,6 +502,7 @@
             player.shield = false;
             game.shake = 1;
             burst(player.laneX, GROUND_Y - 60, 18, "#8ecdf7");
+            Audio.sfx("shield");
           } else {
             gameOver();
             return;
@@ -434,12 +533,15 @@
       if (c.kind === "coffee") {
         game.coffees += 1;
         burst(pos.x, GROUND_Y - 70 - c.air * JUMP_HEIGHT, 6, "#c58c53");
+        Audio.sfx("coffee");
       } else if (c.kind === "stapler") {
         game.coffees += 50;
         burst(pos.x, GROUND_Y - 80, 24, "#ffd76e");
+        Audio.sfx("promotion");
       } else {
         applyPower(c.pu);
         burst(pos.x, GROUND_Y - 80, 14, "#9be89b");
+        Audio.sfx("power");
       }
     }
 
@@ -485,6 +587,7 @@
   function gameOver() {
     state = S.OVER;
     musicPause();
+    Audio.sfx("crash");
     game.shake = 1.4;
     bestDistance = Math.max(bestDistance, game.distance);
     burst(player.laneX, GROUND_Y - 60, 30, "#e05c5c");
@@ -835,7 +938,7 @@
       { text: "OFFICE RUN", font: "bold 44px sans-serif", color: "#ffd76e", gap: 46 },
       { text: "Sprint the corridor. Dodge the furniture. Chase the promotion.", gap: 40 },
       { text: "← → / A D — change lane    ↑ / W / Space — jump    ↓ / S — slide", color: "#bcd3ee", gap: 30 },
-      { text: "Swipe on mobile · Esc/P pauses · M mutes music", color: "#bcd3ee", gap: 44 },
+      { text: "Swipe on mobile · Esc/P pauses · M mutes audio", color: "#bcd3ee", gap: 44 },
       { text: "Press Space or tap to clock in", font: "bold 22px sans-serif", color: "#9be89b" },
     ]);
   }

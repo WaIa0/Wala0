@@ -9,18 +9,24 @@
   <meta property="og:description" content="Dodge office obstacles, collect coffee, climb from Intern to CEO." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="assets/runner_spritesheet.png" />
+  <meta name="theme-color" content="#1a1d26" />
   <link rel="manifest" href="site.webmanifest" />
-  <link rel="icon" href="assets/runner_base.png" type="image/png" />
+  <link rel="icon" href="assets/icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="game-wrap">
     <canvas id="game" width="960" height="540"></canvas>
     <div id="loading">Brewing coffee&hellip;</div>
-    <div id="music-box" title="Background music (M to mute)">
-      <div id="yt-player"></div>
-    </div>
   </div>
   <script src="game.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
