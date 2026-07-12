@@ -163,6 +163,54 @@
     };
   }
 
+  /* ---------------- music (YouTube embed) ---------------- */
+
+  // Streams the track through YouTube's official player (small visible
+  // widget, bottom-right). Fails silently if YouTube is unreachable.
+  const MUSIC_VIDEO_ID = "ko70cExuzZM";
+  let ytPlayer = null;
+  let ytReady = false;
+  let musicMuted = false;
+
+  (function initMusic() {
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    tag.onerror = () => { document.getElementById("music-box").style.display = "none"; };
+    document.head.appendChild(tag);
+    window.onYouTubeIframeAPIReady = function () {
+      ytPlayer = new YT.Player("yt-player", {
+        videoId: MUSIC_VIDEO_ID,
+        playerVars: {
+          loop: 1,
+          playlist: MUSIC_VIDEO_ID, // required for loop to work
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          playsinline: 1,
+        },
+        events: {
+          onReady: () => { ytReady = true; ytPlayer.setVolume(35); },
+          onError: () => { document.getElementById("music-box").style.display = "none"; },
+        },
+      });
+    };
+  })();
+
+  function musicPlay() {
+    if (ytReady && !musicMuted) { try { ytPlayer.playVideo(); } catch (e) {} }
+  }
+  function musicPause() {
+    if (ytReady) { try { ytPlayer.pauseVideo(); } catch (e) {} }
+  }
+  function musicToggleMute() {
+    if (!ytReady) return;
+    musicMuted = !musicMuted;
+    try {
+      if (musicMuted) { ytPlayer.mute(); }
+      else { ytPlayer.unMute(); if (state === S.RUNNING) ytPlayer.playVideo(); }
+    } catch (e) {}
+  }
+
   /* ---------------- input ---------------- */
 
   function moveLane(dir) {
@@ -189,6 +237,7 @@
       e.preventDefault();
     } else if (k === "ArrowDown" || k === "s" || k === "S") doSlide();
     else if (k === "Escape" || k === "p" || k === "P") togglePause();
+    else if (k === "m" || k === "M") musicToggleMute();
   });
 
   canvas.addEventListener("pointerdown", (e) => {
@@ -209,14 +258,15 @@
   });
 
   function togglePause() {
-    if (state === S.RUNNING) state = S.PAUSED;
-    else if (state === S.PAUSED) { state = S.RUNNING; lastT = performance.now(); }
+    if (state === S.RUNNING) { state = S.PAUSED; musicPause(); }
+    else if (state === S.PAUSED) { state = S.RUNNING; lastT = performance.now(); musicPlay(); }
   }
 
   function startRun() {
     resetRun();
     state = S.RUNNING;
     lastT = performance.now();
+    musicPlay();
   }
 
   /* ---------------- spawning ---------------- */
@@ -434,6 +484,7 @@
 
   function gameOver() {
     state = S.OVER;
+    musicPause();
     game.shake = 1.4;
     bestDistance = Math.max(bestDistance, game.distance);
     burst(player.laneX, GROUND_Y - 60, 30, "#e05c5c");
@@ -784,7 +835,7 @@
       { text: "OFFICE RUN", font: "bold 44px sans-serif", color: "#ffd76e", gap: 46 },
       { text: "Sprint the corridor. Dodge the furniture. Chase the promotion.", gap: 40 },
       { text: "← → / A D — change lane    ↑ / W / Space — jump    ↓ / S — slide", color: "#bcd3ee", gap: 30 },
-      { text: "Swipe on mobile · Esc/P pauses", color: "#bcd3ee", gap: 44 },
+      { text: "Swipe on mobile · Esc/P pauses · M mutes music", color: "#bcd3ee", gap: 44 },
       { text: "Press Space or tap to clock in", font: "bold 22px sans-serif", color: "#9be89b" },
     ]);
   }
