@@ -1,0 +1,17 @@
+{
+  "name": "Office Run",
+  "short_name": "Office Run",
+  "description": "Endless runner through a sunlit office. Dodge chairs, copiers and cabinets, collect coffee, get promoted from Intern to CEO.",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a1d26",
+  "theme_color": "#1a1d26",
+  "icons": [
+    {
+      "src": "assets/runner_base.png",
+      "sizes": "331x472",
+      "type": "image/png"
+    }
+  ]
+}
