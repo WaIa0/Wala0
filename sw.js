@@ -1,5 +1,5 @@
 /* Office Run service worker — cache-first for full offline play. */
-const CACHE = "office-run-v1";
+const CACHE = "office-run-v2";
 const ASSETS = [
   ".",
   "index.html",
@@ -34,6 +34,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  // never cache the leaderboard API — always live
+  if (new URL(e.request.url).pathname.includes("/api/")) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (hit) =>

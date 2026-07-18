@@ -19,6 +19,20 @@
   <div id="game-wrap">
     <canvas id="game" width="960" height="540"></canvas>
     <div id="loading">Brewing coffee&hellip;</div>
+    <aside id="board" hidden>
+      <h2>&#127942; Top 10 Runners</h2>
+      <ol id="board-list"></ol>
+      <p id="board-empty" hidden>No scores yet &mdash; set the first one!</p>
+      <p id="board-offline" hidden>Leaderboard needs an internet connection.</p>
+      <form id="board-form" hidden autocomplete="off">
+        <label for="player-name">Your run made the office news! Enter your name:</label>
+        <div class="row">
+          <input id="player-name" type="text" maxlength="16" placeholder="Name" required />
+          <button type="submit">Post score</button>
+        </div>
+      </form>
+      <p id="board-thanks" hidden>Posted! Now defend your spot. &#9749;</p>
+    </aside>
   </div>
   <script src="game.js"></script>
   <script>

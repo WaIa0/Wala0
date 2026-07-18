@@ -39,3 +39,116 @@ html, body {
   letter-spacing: 1px;
   pointer-events: none;
 }
+
+/* Leaderboard panel (visible on menu & game-over screens) */
+#board {
+  position: fixed;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 230px;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: rgba(15, 18, 28, 0.82);
+  border: 1px solid rgba(255, 215, 110, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #eef2f8;
+  z-index: 5;
+}
+
+#board h2 {
+  font-size: 16px;
+  color: #ffd76e;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+#board ol {
+  list-style: none;
+  counter-reset: rank;
+  font-size: 13px;
+}
+
+#board ol li {
+  counter-increment: rank;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+#board ol li::before {
+  content: counter(rank) ".";
+  color: #9fd0ff;
+  min-width: 18px;
+}
+
+#board ol li .nm {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#board ol li .sc {
+  color: #f0c987;
+  white-space: nowrap;
+}
+
+#board ol li.self {
+  color: #9be89b;
+}
+
+#board p {
+  font-size: 12px;
+  color: #bcd3ee;
+  margin-top: 8px;
+}
+
+#board form {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #bcd3ee;
+}
+
+#board form .row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+#board input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+}
+
+#board button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #ffd76e;
+  color: #23262f;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#board button:hover {
+  background: #ffe49a;
+}
+
+@media (max-width: 900px) {
+  #board {
+    right: 6px;
+    width: 180px;
+    font-size: 12px;
+  }
+}

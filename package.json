@@ -1,0 +1,9 @@
+{
+  "name": "office-run",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Office Run — browser endless runner",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

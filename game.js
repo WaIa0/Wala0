@@ -308,6 +308,79 @@
   function musicPause() { Audio.stop(); }
   function musicToggleMute() { Audio.toggleMute(); }
 
+  /* ---------------- leaderboard ---------------- */
+
+  const LB_API = "api/leaderboard";
+  const boardEl = document.getElementById("board");
+  const boardList = document.getElementById("board-list");
+  const boardEmpty = document.getElementById("board-empty");
+  const boardOffline = document.getElementById("board-offline");
+  const boardForm = document.getElementById("board-form");
+  const boardThanks = document.getElementById("board-thanks");
+  const nameInput = document.getElementById("player-name");
+  let boardData = null;      // null = not loaded, [] = loaded empty
+  let boardAvailable = true;
+  let scoreSubmitted = false;
+  let lastPostedName = "";   // remembered for the session only
+
+  function fetchBoard() {
+    fetch(LB_API, { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((data) => { boardData = data; boardAvailable = true; renderBoard(); })
+      .catch(() => { boardAvailable = false; renderBoard(); });
+  }
+
+  function renderBoard() {
+    boardOffline.hidden = boardAvailable;
+    boardEmpty.hidden = !(boardAvailable && boardData && boardData.length === 0);
+    boardList.innerHTML = "";
+    if (boardAvailable && boardData) {
+      for (const e of boardData) {
+        const li = document.createElement("li");
+        const nm = document.createElement("span");
+        nm.className = "nm";
+        nm.textContent = e.name; // textContent => safe against HTML injection
+        const sc = document.createElement("span");
+        sc.className = "sc";
+        sc.textContent = e.distance + " m";
+        if (scoreSubmitted && e.name === lastPostedName && e.distance === Math.floor(game.distance)) {
+          li.className = "self";
+        }
+        li.appendChild(nm);
+        li.appendChild(sc);
+        boardList.appendChild(li);
+      }
+    }
+    // offer name entry after a real run, once per run, only when online
+    boardForm.hidden = !(state === S.OVER && boardAvailable && !scoreSubmitted && game.distance >= 1);
+    boardThanks.hidden = !(state === S.OVER && scoreSubmitted);
+  }
+
+  function updateBoardVisibility() {
+    boardEl.hidden = !(state === S.MENU || state === S.OVER);
+    if (!boardEl.hidden) { fetchBoard(); renderBoard(); }
+  }
+
+  boardForm.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const name = nameInput.value.trim().slice(0, 16);
+    if (!name) return;
+    lastPostedName = name;
+    scoreSubmitted = true;
+    renderBoard();
+    fetch(LB_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, distance: Math.floor(game.distance), coffees: game.coffees }),
+    })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((data) => { boardData = data; renderBoard(); })
+      .catch(() => { boardAvailable = false; renderBoard(); });
+  });
+
+  // keep game hotkeys (Space/M/arrows) out of the name form
+  boardForm.addEventListener("keydown", (e) => e.stopPropagation());
+
   /* ---------------- input ---------------- */
 
   function moveLane(dir) {
@@ -362,6 +435,8 @@
   function startRun() {
     resetRun();
     state = S.RUNNING;
+    scoreSubmitted = false;
+    updateBoardVisibility();
     lastT = performance.now();
     musicPlay();
   }
@@ -591,6 +666,8 @@
     game.shake = 1.4;
     bestDistance = Math.max(bestDistance, game.distance);
     burst(player.laneX, GROUND_Y - 60, 30, "#e05c5c");
+    if (lastPostedName) nameInput.value = lastPostedName;
+    updateBoardVisibility();
   }
 
   function burst(x, y, n, color) {
@@ -1008,6 +1085,7 @@
     .then(() => {
       document.getElementById("loading").style.display = "none";
       state = S.MENU;
+      updateBoardVisibility();
       requestAnimationFrame(frame);
     })
     .catch((err) => {
