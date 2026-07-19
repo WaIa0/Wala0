@@ -1,5 +1,5 @@
 /* Office Run service worker — cache-first for full offline play. */
-const CACHE = "office-run-v4";
+const CACHE = "office-run-v5";
 const ASSETS = [
   ".",
   "index.html",
