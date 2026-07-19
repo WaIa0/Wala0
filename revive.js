@@ -4,7 +4,7 @@
    What it does:
    - Shows a "Second Wind?" overlay when the player crashes
    - One revive allowed per run
-   - 5-second countdown; if it expires, normal game over
+   - No countdown: the player chooses Continue or Back to Work
    - Today: revive is free (validation phase)
    - Later: swap ONE function (showRewardedAd) for the
      CrazyGames SDK rewarded ad. Nothing else changes.
@@ -24,9 +24,7 @@
    ============================================================ */
 
 const ReviveSystem = (() => {
-  const COUNTDOWN_SECONDS = 5;
   let usedThisRun = false;
-  let timerId = null;
 
   /* ---------- FUTURE AD SLOT ----------------------------------
      Validation phase: succeeds instantly (free revive).
@@ -60,12 +58,7 @@ const ReviveSystem = (() => {
       box-shadow: 0 18px 50px rgba(0,0,0,.5);
     }
     .rv-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; }
-    .rv-sub { font-size: .9rem; opacity: .75; margin: 0 0 18px; }
-    .rv-count {
-      font-size: 2.4rem; font-weight: 800; line-height: 1;
-      color: #e8b64c; margin-bottom: 18px;
-      font-variant-numeric: tabular-nums;
-    }
+    .rv-sub { font-size: .9rem; opacity: .75; margin: 0 0 20px; }
     .rv-btn {
       display: block; width: 100%; border: 0; cursor: pointer;
       border-radius: 10px; padding: 14px 12px; font-size: 1rem;
@@ -96,15 +89,13 @@ const ReviveSystem = (() => {
       <div class="rv-card" role="dialog" aria-label="Continue run">
         <p class="rv-title">Second wind? ☕</p>
         <p class="rv-sub">Keep your streak — one revive per run</p>
-        <div class="rv-count" id="rv-count">${COUNTDOWN_SECONDS}</div>
-        <button class="rv-btn rv-btn-revive" id="rv-yes">Keep running</button>
-        <button class="rv-btn rv-btn-quit" id="rv-no">Clock out</button>
+        <button class="rv-btn rv-btn-revive" id="rv-yes">Continue</button>
+        <button class="rv-btn rv-btn-quit" id="rv-no">Back to Work</button>
       </div>`;
     document.body.appendChild(overlay);
   }
 
   function hide() {
-    clearInterval(timerId);
     document.getElementById("rv-overlay").classList.remove("rv-show");
   }
 
@@ -119,22 +110,10 @@ const ReviveSystem = (() => {
 
     ensureDom();
     const overlay = document.getElementById("rv-overlay");
-    const countEl = document.getElementById("rv-count");
     const yesBtn = document.getElementById("rv-yes");
     const noBtn = document.getElementById("rv-no");
 
-    let remaining = COUNTDOWN_SECONDS;
-    countEl.textContent = remaining;
     overlay.classList.add("rv-show");
-
-    timerId = setInterval(() => {
-      remaining -= 1;
-      countEl.textContent = remaining;
-      if (remaining <= 0) {
-        hide();
-        onGiveUp();
-      }
-    }, 1000);
 
     yesBtn.onclick = () => {
       hide();
