@@ -8,7 +8,8 @@ const MAX_ENTRIES = 10;
 const MAX_DISTANCE = 200000; // sanity cap; ~2 hours of perfect play
 
 export default async (req: Request) => {
-  const store = getStore("leaderboard");
+  // strong consistency: a freshly posted score is visible immediately
+  const store = getStore({ name: "leaderboard", consistency: "strong" });
   const headers = { "Cache-Control": "no-store" };
 
   if (req.method === "GET") {
