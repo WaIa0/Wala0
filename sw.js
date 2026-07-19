@@ -1,10 +1,11 @@
 /* Office Run service worker — cache-first for full offline play. */
-const CACHE = "office-run-v2";
+const CACHE = "office-run-v3";
 const ASSETS = [
   ".",
   "index.html",
   "style.css",
   "game.js",
+  "revive.js",
   "site.webmanifest",
   "assets/office_bg.png",
   "assets/runner_base.png",

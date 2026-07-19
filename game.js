@@ -89,7 +89,7 @@
 
   /* ---------------- state ---------------- */
 
-  const S = { LOADING: 0, MENU: 1, RUNNING: 2, PAUSED: 3, OVER: 4 };
+  const S = { LOADING: 0, MENU: 1, RUNNING: 2, PAUSED: 3, OVER: 4, REVIVE: 5 };
   let state = S.LOADING;
 
   let bestDistance = 0; // in-memory only
@@ -112,6 +112,7 @@
     titleIdx: 0,
     espressoT: 0,     // remaining seconds
     magnetT: 0,
+    graceT: 0,        // post-revive invincibility
     shake: 0,         // screen-shake intensity
     bannerT: 0,       // promotion banner timer
     bannerText: "",
@@ -137,6 +138,7 @@
     game.titleIdx = 0;
     game.espressoT = 0;
     game.magnetT = 0;
+    game.graceT = 0;
     game.shake = 0;
     game.bannerT = 0;
     obstacles = [];
@@ -434,6 +436,7 @@
 
   function startRun() {
     resetRun();
+    ReviveSystem.resetRun();
     state = S.RUNNING;
     scoreSubmitted = false;
     updateBoardVisibility();
@@ -511,6 +514,7 @@
     // timers
     if (game.espressoT > 0) game.espressoT = Math.max(0, game.espressoT - dt);
     if (game.magnetT > 0) game.magnetT = Math.max(0, game.magnetT - dt);
+    if (game.graceT > 0) game.graceT = Math.max(0, game.graceT - dt);
     if (game.bannerT > 0) game.bannerT -= dt;
     game.shake = Math.max(0, game.shake - dt * 3.2);
 
@@ -570,7 +574,7 @@
         let hit = true;
         if (o.type === OB.CHAIR && jumpOffset() > JUMP_HEIGHT * 0.42) hit = false;
         if (o.type === OB.CABINET && player.slideT >= 0) hit = false;
-        if (game.espressoT > 0) hit = false; // invincible
+        if (game.espressoT > 0 || game.graceT > 0) hit = false; // invincible
         if (hit) {
           obstacles.splice(i, 1);
           if (player.shield) {
@@ -579,7 +583,7 @@
             burst(player.laneX, GROUND_Y - 60, 18, "#8ecdf7");
             Audio.sfx("shield");
           } else {
-            gameOver();
+            triggerCrash();
             return;
           }
         }
@@ -659,13 +663,32 @@
     else player.shield = true;
   }
 
-  function gameOver() {
-    state = S.OVER;
+  // Crash → freeze the run and let ReviveSystem decide the outcome.
+  function triggerCrash() {
+    state = S.REVIVE;
     musicPause();
     Audio.sfx("crash");
     game.shake = 1.4;
-    bestDistance = Math.max(bestDistance, game.distance);
     burst(player.laneX, GROUND_Y - 60, 30, "#e05c5c");
+    ReviveSystem.offer({ onRevive: reviveRun, onGiveUp: gameOver });
+  }
+
+  function reviveRun() {
+    // clear hazards ahead of the player and grant a short grace period
+    obstacles = obstacles.filter((o) => o.p < 0.55);
+    player.jumpT = -1;
+    player.slideT = -1;
+    game.graceT = 1.5;
+    state = S.RUNNING;
+    lastT = performance.now();
+    Audio.sfx("power");
+    musicPlay();
+  }
+
+  function gameOver() {
+    state = S.OVER;
+    musicPause();
+    bestDistance = Math.max(bestDistance, game.distance);
     if (lastPostedName) nameInput.value = lastPostedName;
     updateBoardVisibility();
   }
@@ -757,6 +780,7 @@
     ctx.save();
     ctx.translate(x, footY - jo);
     ctx.rotate(-0.045); // slight lean into the corridor
+    if (game.graceT > 0) ctx.globalAlpha = 0.45 + 0.4 * Math.sin(game.time * 18); // revive blink
     if (player.shield) {
       ctx.beginPath();
       ctx.arc(0, -h / 2, h * 0.62, 0, Math.PI * 2);
@@ -1063,8 +1087,10 @@
 
     if (state === S.RUNNING) {
       update(dt);
-      if (state === S.RUNNING) drawWorld();
+      if (state === S.RUNNING || state === S.REVIVE) drawWorld();
       else if (state === S.OVER) drawOver();
+    } else if (state === S.REVIVE) {
+      drawWorld();
     } else if (state === S.MENU) {
       drawMenu();
     } else if (state === S.PAUSED) {
