@@ -6,7 +6,7 @@ effects are synthesized in code at runtime — there are no licensed audio
 assets, so the whole project can be sold or published commercially.
 (Verify the art assets' license if they came from an AI image tool.)
 
-Live site: https://wala0-run-for-your-life.netlify.app
+Live site: https://office-run-arcade.netlify.app
 
 ## 1. itch.io (free, ~30 minutes, do this first)
 

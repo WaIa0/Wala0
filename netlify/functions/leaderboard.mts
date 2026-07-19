@@ -16,6 +16,19 @@ export default async (req: Request) => {
     return Response.json(data, { headers });
   }
 
+  // Admin reset: DELETE with the secret key from the site's env vars.
+  // The key never appears in the public source — set it in Netlify UI:
+  // Site configuration -> Environment variables -> LEADERBOARD_RESET_KEY
+  if (req.method === "DELETE") {
+    const expected = process.env.LEADERBOARD_RESET_KEY ?? "";
+    const given = req.headers.get("x-reset-key") ?? "";
+    if (!expected || given !== expected) {
+      return new Response("forbidden", { status: 403 });
+    }
+    await store.setJSON("top", []);
+    return Response.json([], { headers });
+  }
+
   if (req.method === "POST") {
     let body: any;
     try {
